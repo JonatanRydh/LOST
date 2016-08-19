@@ -1,17 +1,24 @@
 package com.mapzen.android.lost.internal;
 
 import com.mapzen.android.lost.api.FusedLocationProviderApi;
+import com.mapzen.android.lost.api.LocationAvailability;
+import com.mapzen.android.lost.api.LocationCallback;
 import com.mapzen.android.lost.api.LocationListener;
 import com.mapzen.android.lost.api.LocationRequest;
+import com.mapzen.android.lost.api.LocationResult;
 
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationManager;
+import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -28,20 +35,35 @@ public class FusedLocationProviderApiImpl
   private LocationEngine locationEngine;
   private Map<LocationListener, LocationRequest> listenerToRequest;
   private Map<PendingIntent, LocationRequest> intentToRequest;
+  private Map<LocationCallback, LocationRequest> callbackToRequest;
+  private Map<LocationCallback, Looper> callbackToLooper;
 
   public FusedLocationProviderApiImpl(Context context) {
     this.context = context;
     locationEngine = new FusionEngine(context, this);
     listenerToRequest = new HashMap<>();
     intentToRequest = new HashMap<>();
+    callbackToRequest = new HashMap<>();
+    callbackToLooper = new HashMap<>();
   }
 
   @Override public Location getLastLocation() {
     return locationEngine.getLastLocation();
   }
 
+  @Override public LocationAvailability getLocationAvailability() {
+    return createLocationAvailability();
+  }
+
   @Override public void requestLocationUpdates(LocationRequest request, LocationListener listener) {
     listenerToRequest.put(listener, request);
+    locationEngine.setRequest(request);
+  }
+
+  @Override public void requestLocationUpdates(LocationRequest request, LocationCallback callback,
+      Looper looper) {
+    callbackToRequest.put(callback, request);
+    callbackToLooper.put(callback, looper);
     locationEngine.setRequest(request);
   }
 
@@ -58,20 +80,26 @@ public class FusedLocationProviderApiImpl
 
   @Override public void removeLocationUpdates(LocationListener listener) {
     listenerToRequest.remove(listener);
-    checkAllListenersAndPendingIntents();
+    checkAllListenersPendingIntentsAndCallbacks();
   }
 
   @Override public void removeLocationUpdates(PendingIntent callbackIntent) {
     intentToRequest.remove(callbackIntent);
-    checkAllListenersAndPendingIntents();
+    checkAllListenersPendingIntentsAndCallbacks();
+  }
+
+  @Override public void removeLocationUpdates(LocationCallback callback) {
+    callbackToRequest.remove(callback);
+    callbackToLooper.remove(callback);
+    checkAllListenersPendingIntentsAndCallbacks();
   }
 
   /**
    * Checks if any listeners or pending intents are still registered for location updates. If not,
    * then shutdown the location engine.
    */
-  private void checkAllListenersAndPendingIntents() {
-    if (listenerToRequest.isEmpty() && intentToRequest.isEmpty()) {
+  private void checkAllListenersPendingIntentsAndCallbacks() {
+    if (listenerToRequest.isEmpty() && intentToRequest.isEmpty() && callbackToRequest.isEmpty()) {
       locationEngine.setRequest(null);
     }
   }
@@ -120,26 +148,66 @@ public class FusedLocationProviderApiImpl
         Log.e(TAG, "Unable to send pending intent: " + intent);
       }
     }
+
+    ArrayList<Location> locations = new ArrayList<>();
+    locations.add(location);
+    final LocationResult result = LocationResult.create(locations);
+    for (final LocationCallback callback : callbackToRequest.keySet()) {
+      Looper looper = callbackToLooper.get(callback);
+      Handler handler = new Handler(looper);
+      handler.post(new Runnable() {
+        @Override public void run() {
+          callback.onLocationResult(result);
+        }
+      });
+    }
   }
 
   @Override public void reportProviderDisabled(String provider) {
     for (LocationListener listener : listenerToRequest.keySet()) {
       listener.onProviderDisabled(provider);
     }
+
+    notifyLocationAvailabilityChanged();
   }
 
   @Override public void reportProviderEnabled(String provider) {
     for (LocationListener listener : listenerToRequest.keySet()) {
       listener.onProviderEnabled(provider);
     }
+
+    notifyLocationAvailabilityChanged();
   }
 
   public void shutdown() {
     listenerToRequest.clear();
+    callbackToRequest.clear();
+    callbackToLooper.clear();
     locationEngine.setRequest(null);
   }
 
   public Map<LocationListener, LocationRequest> getListeners() {
     return listenerToRequest;
+  }
+
+  private LocationAvailability createLocationAvailability() {
+    LocationManager locationManager = (LocationManager) context.getSystemService(
+        Context.LOCATION_SERVICE);
+    boolean gpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+    boolean networkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+    return new LocationAvailability(gpsEnabled & networkEnabled);
+  }
+
+  private void notifyLocationAvailabilityChanged() {
+    final LocationAvailability availability = createLocationAvailability();
+    for (final LocationCallback callback : callbackToRequest.keySet()) {
+      Looper looper = callbackToLooper.get(callback);
+      Handler handler = new Handler(looper);
+      handler.post(new Runnable() {
+        @Override public void run() {
+          callback.onLocationAvailability(availability);
+        }
+      });
+    }
   }
 }
