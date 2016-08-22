@@ -141,17 +141,22 @@ public class FusedLocationProviderApiImpl
       listener.onLocationChanged(location);
     }
 
+    LocationAvailability availability = createLocationAvailability();
+    ArrayList<Location> locations = new ArrayList<>();
+    locations.add(location);
+    final LocationResult result = LocationResult.create(locations);
     for (PendingIntent intent : intentToRequest.keySet()) {
       try {
-        intent.send(context, 0, new Intent().putExtra(KEY_LOCATION_CHANGED, location));
+        Intent toSend = new Intent().putExtra(KEY_LOCATION_CHANGED, location);
+        toSend.putExtra(LocationAvailability.EXTRA_LOCATION_AVAILABILITY, availability);
+        toSend.putExtra(LocationResult.EXTRA_LOCATION_RESULT, result);
+        intent.send(context, 0, toSend);
       } catch (PendingIntent.CanceledException e) {
         Log.e(TAG, "Unable to send pending intent: " + intent);
       }
     }
 
-    ArrayList<Location> locations = new ArrayList<>();
-    locations.add(location);
-    final LocationResult result = LocationResult.create(locations);
+
     for (final LocationCallback callback : callbackToRequest.keySet()) {
       Looper looper = callbackToLooper.get(callback);
       Handler handler = new Handler(looper);
