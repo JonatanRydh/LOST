@@ -14,7 +14,6 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.Robolectric;
 import org.robolectric.RobolectricGradleTestRunner;
 import org.robolectric.annotation.Config;
 import org.robolectric.shadows.ShadowApplication;
@@ -26,7 +25,6 @@ import org.robolectric.util.ReflectionHelpers;
 import android.app.IntentService;
 import android.app.PendingIntent;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Environment;
@@ -47,7 +45,6 @@ import static com.mapzen.android.lost.api.LocationRequest.PRIORITY_BALANCED_POWE
 import static com.mapzen.android.lost.api.LocationRequest.PRIORITY_HIGH_ACCURACY;
 import static org.fest.assertions.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.robolectric.RuntimeEnvironment.application;
 import static org.robolectric.Shadows.shadowOf;
 
@@ -207,7 +204,7 @@ public class FusedLocationProviderApiImplTest {
     api.requestLocationUpdates(request, callback, looper);
     Location location = getTestLocation(NETWORK_PROVIDER, 0, 0, 0);
     shadowLocationManager.simulateLocation(location);
-    assertThat(callback.result.getLastLocation()).isEqualTo(location);
+    assertThat(callback.getResult().getLastLocation()).isEqualTo(location);
   }
 
   @Test public void requestLocationUpdates_shouldReportAvailability() {
@@ -216,7 +213,7 @@ public class FusedLocationProviderApiImplTest {
     LocationRequest request = LocationRequest.create();
     api.requestLocationUpdates(request, callback, looper);
     shadowLocationManager.setProviderEnabled(NETWORK_PROVIDER, true);
-    assertThat(callback.availability.isLocationAvailable()).isEqualTo(true);
+    assertThat(callback.getAvailability().isLocationAvailable()).isEqualTo(true);
   }
 
   @Test public void getLocationAvailability_gps_network_shouldBeAvailable() {
@@ -629,8 +626,8 @@ public class FusedLocationProviderApiImplTest {
 
   public class TestLocationCallback implements LocationCallback {
 
-    public LocationAvailability availability;
-    public LocationResult result;
+    private LocationAvailability availability;
+    private LocationResult result;
 
     @Override public void onLocationAvailability(LocationAvailability locationAvailability) {
       availability = locationAvailability;
@@ -638,6 +635,14 @@ public class FusedLocationProviderApiImplTest {
 
     @Override public void onLocationResult(LocationResult locationResult) {
       result = locationResult;
+    }
+
+    public LocationAvailability getAvailability() {
+      return availability;
+    }
+
+    public LocationResult getResult() {
+      return result;
     }
   }
 }
