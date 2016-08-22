@@ -15,7 +15,7 @@ import java.util.List;
  */
 public final class LocationResult implements Parcelable {
   public static final String EXTRA_LOCATION_RESULT =
-      "com.mapzen.android.lost.location.EXTRA_LOCATION_RESULT";
+      "com.mapzen.android.lost.EXTRA_LOCATION_RESULT";
 
   private final List<Location> locations;
 

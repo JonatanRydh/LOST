@@ -17,7 +17,7 @@ import android.os.Parcelable;
 public class LocationAvailability implements Parcelable {
 
   public static final String EXTRA_LOCATION_AVAILABILITY =
-      "com.mapzen.android.lost.location.EXTRA_LOCATION_AVAILABILITY";
+      "com.mapzen.android.lost.EXTRA_LOCATION_AVAILABILITY";
 
   boolean locationAvailable = false;
 

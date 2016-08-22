@@ -200,7 +200,7 @@ public class FusedLocationProviderApiImpl
         Context.LOCATION_SERVICE);
     boolean gpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
     boolean networkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
-    return new LocationAvailability(gpsEnabled & networkEnabled);
+    return new LocationAvailability(gpsEnabled || networkEnabled);
   }
 
   private void notifyLocationAvailabilityChanged() {

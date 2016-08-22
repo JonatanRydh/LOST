@@ -1,7 +1,10 @@
 package com.mapzen.android.lost.internal;
 
+import com.mapzen.android.lost.api.LocationAvailability;
+import com.mapzen.android.lost.api.LocationCallback;
 import com.mapzen.android.lost.api.LocationListener;
 import com.mapzen.android.lost.api.LocationRequest;
+import com.mapzen.android.lost.api.LocationResult;
 import com.mapzen.lost.BuildConfig;
 
 import com.google.common.base.Charsets;
@@ -11,6 +14,7 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.Robolectric;
 import org.robolectric.RobolectricGradleTestRunner;
 import org.robolectric.annotation.Config;
 import org.robolectric.shadows.ShadowApplication;
@@ -22,9 +26,11 @@ import org.robolectric.util.ReflectionHelpers;
 import android.app.IntentService;
 import android.app.PendingIntent;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Environment;
+import android.os.Looper;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -40,10 +46,12 @@ import static com.mapzen.android.lost.api.FusedLocationProviderApi.KEY_LOCATION_
 import static com.mapzen.android.lost.api.LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY;
 import static com.mapzen.android.lost.api.LocationRequest.PRIORITY_HIGH_ACCURACY;
 import static org.fest.assertions.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.robolectric.RuntimeEnvironment.application;
 import static org.robolectric.Shadows.shadowOf;
 
-@RunWith(RobolectricGradleTestRunner.class)
+@SuppressWarnings("MissingPermission") @RunWith(RobolectricGradleTestRunner.class)
 @Config(constants = BuildConfig.class, sdk = 21, manifest = Config.NONE)
 public class FusedLocationProviderApiImplTest {
   private FusedLocationProviderApiImpl api;
@@ -192,11 +200,66 @@ public class FusedLocationProviderApiImplTest {
     assertThat(listener.getMostRecentLocation()).isEqualTo(networkLocation);
   }
 
+  @Test public void requestLocationUpdates_shouldReportResult() {
+    TestLocationCallback callback = new TestLocationCallback();
+    Looper looper = Looper.myLooper();
+    LocationRequest request = LocationRequest.create();
+    api.requestLocationUpdates(request, callback, looper);
+    Location location = getTestLocation(NETWORK_PROVIDER, 0, 0, 0);
+    shadowLocationManager.simulateLocation(location);
+    assertThat(callback.result.getLastLocation()).isEqualTo(location);
+  }
+
+  @Test public void requestLocationUpdates_shouldReportAvailability() {
+    TestLocationCallback callback = new TestLocationCallback();
+    Looper looper = Looper.myLooper();
+    LocationRequest request = LocationRequest.create();
+    api.requestLocationUpdates(request, callback, looper);
+    shadowLocationManager.setProviderEnabled(NETWORK_PROVIDER, true);
+    assertThat(callback.availability.isLocationAvailable()).isEqualTo(true);
+  }
+
+  @Test public void getLocationAvailability_gps_network_shouldBeAvailable() {
+    shadowLocationManager.setProviderEnabled(GPS_PROVIDER, true);
+    shadowLocationManager.setProviderEnabled(NETWORK_PROVIDER, true);
+
+    LocationAvailability availability = api.getLocationAvailability();
+    assertThat(availability.isLocationAvailable()).isTrue();
+  }
+
+  @Test public void getLocationAvailability_gps_shouldBeAvailable() {
+    shadowLocationManager.setProviderEnabled(GPS_PROVIDER, true);
+
+    LocationAvailability availability = api.getLocationAvailability();
+    assertThat(availability.isLocationAvailable()).isTrue();
+  }
+
+  @Test public void getLocationAvailability_network_shouldBeAvailable() {
+    shadowLocationManager.setProviderEnabled(NETWORK_PROVIDER, true);
+
+    LocationAvailability availability = api.getLocationAvailability();
+    assertThat(availability.isLocationAvailable()).isTrue();
+  }
+
+  @Test public void getLocationAvailability_shouldBeUnavailable() {
+    LocationAvailability availability = api.getLocationAvailability();
+    assertThat(availability.isLocationAvailable()).isFalse();
+  }
+
   @Test public void removeLocationUpdates_shouldUnregisterAllListeners() throws Exception {
     TestLocationListener listener = new TestLocationListener();
     LocationRequest request = LocationRequest.create();
     api.requestLocationUpdates(request, listener);
     api.removeLocationUpdates(listener);
+    assertThat(shadowLocationManager.getRequestLocationUpdateListeners()).isEmpty();
+  }
+
+  @Test public void removeLocationUpdates_locationCallback_shouldUnregisterAllListeners() {
+    TestLocationCallback callback = new TestLocationCallback();
+    Looper looper = mock(Looper.class);
+    LocationRequest request = LocationRequest.create();
+    api.requestLocationUpdates(request, callback, looper);
+    api.removeLocationUpdates(callback);
     assertThat(shadowLocationManager.getRequestLocationUpdateListeners()).isEmpty();
   }
 
@@ -560,6 +623,20 @@ public class FusedLocationProviderApiImplTest {
     }
 
     @Override protected void onHandleIntent(Intent intent) {
+    }
+  }
+
+  public class TestLocationCallback implements LocationCallback {
+
+    public LocationAvailability availability;
+    public LocationResult result;
+
+    @Override public void onLocationAvailability(LocationAvailability locationAvailability) {
+      availability = locationAvailability;
+    }
+
+    @Override public void onLocationResult(LocationResult locationResult) {
+      result = locationResult;
     }
   }
 }
