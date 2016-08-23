@@ -1,21 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.mapzen.lost">
+<manifest package="com.mapzen.lost"
+          xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
 
     <uses-feature
         android:name="android.hardware.sensor.accelerometer"
-        android:required="false" />
-    <uses-feature android:name="android.hardware.location" />
-    <uses-feature android:name="android.hardware.location.gps" />
+        android:required="false"/>
+    <uses-feature
+        android:name="android.hardware.location"
+        android:required="false"/>
+    <uses-feature
+        android:name="android.hardware.location.gps"
+        android:required="false"/>
     <uses-feature
         android:name="android.hardware.telephony"
-        android:required="false" />
-    <uses-feature android:name="android.hardware.wifi" />
+        android:required="false"/>
+    <uses-feature
+        android:name="android.hardware.wifi"
+        android:required="false"/>
 
     <!-- Wow. This is insane. You require an empty tag. -->
-    <application />
+    <application/>
 
 </manifest>
